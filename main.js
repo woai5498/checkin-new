@@ -17,7 +17,8 @@ const glados = async () => {
         headers: { ...common, 'content-type': 'application/json' },
         body: JSON.stringify({ token: domain }),
       }).then((r) => r.json())
-      if (action?.code) throw new Error(`${action?.message} (code=${action?.code}${action?.reason ? ', reason=' + action.reason : ''})`)
+      // repeated=true 表示今天已经签过, 属于正常情况, 不应当作失败
+      if (action?.code && !action?.repeated) throw new Error(`${action?.message} (code=${action?.code}${action?.reason ? ', reason=' + action.reason : ''})`)
       const status = await fetch(`https://${domain}/api/user/status`, {
         method: 'GET',
         headers: { ...common },
@@ -113,7 +114,11 @@ const notify = async (notice) => {
 }
 
 const main = async () => {
-  await notify(await glados())
+  const notice = await glados()
+  await notify(notice)
+  // 任一账号签到失败时返回非 0 退出码, 让 GitHub Actions 真正标记为失败
+  if (Array.isArray(notice) && notice.includes('Checkin Error')) process.exitCode = 1
 }
 
 main()
+
